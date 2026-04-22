@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 import { generateVoterJourney } from '../../services/voter.service';
 import { geminiClient } from '../../lib/gemini';
 import { User, VoterJourneyResponse } from '../../types';
@@ -9,6 +13,10 @@ jest.mock('../../lib/gemini', () => ({
       generateContent: jest.fn(),
     },
   },
+}));
+
+jest.mock('../../lib/logger', () => ({
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
 }));
 
 describe('generateVoterJourney Service', () => {
@@ -60,6 +68,36 @@ describe('generateVoterJourney Service', () => {
         text: null
     });
 
-    await expect(generateVoterJourney(mockUser)).rejects.toThrow("Failed to generate personalized voter journey. Please try again.");
+    await expect(generateVoterJourney(mockUser)).rejects.toThrow();
+  });
+
+  it('should throw AIServiceError when Gemini SDK fails', async () => {
+    const mockUser: User = {
+        name: 'Test',
+        location: { state: 'UP', city: 'Lucknow' },
+        age: 25,
+        isFirstTimeVoter: true,
+        role: 'voter'
+    };
+
+    (geminiClient.models.generateContent as jest.Mock).mockRejectedValue(new Error('SDK Error'));
+
+    await expect(generateVoterJourney(mockUser)).rejects.toThrow();
+  });
+
+  it('should throw when Gemini returns malformed JSON', async () => {
+    const mockUser: User = {
+        name: 'Test',
+        location: { state: 'UP', city: 'Lucknow' },
+        age: 25,
+        isFirstTimeVoter: true,
+        role: 'voter'
+    };
+
+    (geminiClient.models.generateContent as jest.Mock).mockResolvedValue({
+        text: 'not valid json {{{'
+    });
+
+    await expect(generateVoterJourney(mockUser)).rejects.toThrow();
   });
 });

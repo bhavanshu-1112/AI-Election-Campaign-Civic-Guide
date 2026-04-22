@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { Send, Bot, User, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { FAQResponse } from '@/types';
+import { trackFAQAsked } from '@/lib/analytics';
+import { API_ENDPOINTS } from '@/lib/constants';
 
 interface Message {
   id: string;
@@ -16,7 +18,11 @@ interface Message {
   metadata?: FAQResponse;
 }
 
-export function FAQBot({ userId = 'guest' }: { userId?: string }) {
+/**
+ * FAQ Bot component — conversational AI assistant for election queries.
+ * Maintains session state for multi-turn conversations via Firestore.
+ */
+function FAQBotComponent({ userId = 'guest' }: { userId?: string }) {
   const [messages, setMessages] = useState<Message[]>([
     { id: 'initial', role: 'assistant', content: 'Hello! I am your neutral election guide for India. How can I help you understand the voting process today?' }
   ]);
@@ -27,7 +33,6 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
 
   useEffect(() => {
     if (scrollRef.current) {
-        // Find the absolute container inside scrollarea to scroll to bottom
         const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
         if(scrollContainer) {
             scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
@@ -35,7 +40,7 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
     }
   }, [messages, isLoading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
@@ -47,7 +52,7 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/faq/chat', {
+      const response = await fetch(API_ENDPOINTS.FAQ_CHAT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage, userId, sessionId }),
@@ -68,7 +73,10 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
         metadata: data as FAQResponse
       }]);
 
-    } catch (error) {
+      // Track analytics
+      trackFAQAsked(userMessage.length);
+
+    } catch {
       setMessages(prev => [...prev, { 
           id: (Date.now() + 1).toString(), 
           role: 'assistant', 
@@ -77,10 +85,14 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, userId, sessionId]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  }, []);
 
   return (
-    <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto shadow-xl border-primary/20 overflow-hidden bg-background/50 backdrop-blur" aria-label="Election FAQ Chatbot">
+    <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto shadow-xl border-primary/20 overflow-hidden bg-background/50 backdrop-blur" role="region" aria-label="Election FAQ Chatbot">
         
       <div className="bg-primary/10 p-4 border-b flex items-center shadow-sm">
          <div className="bg-primary p-2 rounded-full mr-3 text-primary-foreground">
@@ -89,13 +101,13 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
          <div>
             <h2 className="font-bold">Election Support Bot</h2>
             <p className="text-xs text-muted-foreground flex items-center">
-                <span className="w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse"></span> Online
+                <span className="w-2 h-2 rounded-full bg-green-500 mr-1 animate-pulse" aria-hidden="true"></span>Online
             </p>
          </div>
       </div>
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
+        <div className="space-y-4" role="log" aria-label="Chat messages" aria-live="polite">
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
               <motion.div
@@ -106,7 +118,7 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
               >
                 <div className={`flex max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                     
-                    <div className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full mt-auto ${msg.role === 'user' ? 'bg-primary text-primary-foreground ml-2' : 'bg-muted border mr-2'}`}>
+                    <div className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-full mt-auto ${msg.role === 'user' ? 'bg-primary text-primary-foreground ml-2' : 'bg-muted border mr-2'}`} aria-hidden="true">
                         {msg.role === 'user' ? <User className="w-4 h-4"/> : <Bot className="w-4 h-4 text-primary" />}
                     </div>
                     
@@ -124,9 +136,9 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
                         {msg.metadata && msg.metadata.isElectionRelated && (
                             <div className="flex flex-col gap-1 w-full mt-1 px-1">
                                 {msg.metadata.confidence < 60 ? (
-                                    <span className="text-[10px] text-amber-500 flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> Unverified / Low Confidence</span>
+                                    <span className="text-[10px] text-amber-500 flex items-center"><AlertTriangle className="w-3 h-3 mr-1" aria-hidden="true"/> Unverified / Low Confidence</span>
                                 ) : (
-                                    <span className="text-[10px] text-green-600 flex items-center"><CheckCircle2 className="w-3 h-3 mr-1"/> High Confidence</span>
+                                    <span className="text-[10px] text-green-600 flex items-center"><CheckCircle2 className="w-3 h-3 mr-1" aria-hidden="true"/> High Confidence</span>
                                 )}
                                 <span className="text-[10px] text-muted-foreground opacity-80">{msg.metadata.disclaimer}</span>
                             </div>
@@ -138,7 +150,7 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
           </AnimatePresence>
           
           {isLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start" role="status" aria-label="Bot is typing">
               <div className="flex bg-muted p-4 rounded-2xl rounded-bl-sm ml-10 space-x-2 w-16 justify-center">
                  <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
                  <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -153,7 +165,7 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
         <form onSubmit={handleSubmit} className="flex gap-2 relative">
           <Input 
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             placeholder="Ask about registration, dates, documents..."
             className="flex-1 pr-12 rounded-full border-primary/20 focus-visible:ring-primary/50"
             disabled={isLoading}
@@ -169,8 +181,10 @@ export function FAQBot({ userId = 'guest' }: { userId?: string }) {
             <Send className="w-4 h-4 ml-0.5" />
           </Button>
         </form>
-        <p className="text-center text-[10px] text-muted-foreground mt-2">AI can make mistakes. Check official election sources.</p>
+        <p className="text-center text-[10px] text-muted-foreground mt-2" role="note">AI can make mistakes. Check official election sources.</p>
       </div>
     </Card>
   );
 }
+
+export const FAQBot = memo(FAQBotComponent);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 import { VoterJourneyResponse } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, ClipboardList, AlertCircle, ArrowRight } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { trackJourneyGenerated } from '@/lib/analytics';
+import { API_ENDPOINTS, VALIDATION } from '@/lib/constants';
 
 const formSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -24,7 +26,11 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function VoterJourney() {
+/**
+ * Voter Journey component — generates a personalized election roadmap.
+ * Uses Google Gemini AI via the voter journey API endpoint.
+ */
+function VoterJourneyComponent() {
   const [journeyContent, setJourneyContent] = useState<VoterJourneyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +44,9 @@ export function VoterJourney() {
     }
   });
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = useCallback(async (values: FormValues) => {
     
-    if (parseInt(values.age) < 18) {
+    if (parseInt(values.age) < VALIDATION.MIN_VOTING_AGE) {
         setError('Must be at least 18 to vote.');
         return;
     }
@@ -56,24 +62,32 @@ export function VoterJourney() {
         role: values.role
       };
 
-      const response = await fetch('/api/voter/journey', {
+      const response = await fetch(API_ENDPOINTS.VOTER_JOURNEY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate journey');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate journey');
       }
 
       const data = await response.json();
       setJourneyContent(data);
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+
+      // Track analytics event
+      trackJourneyGenerated(values.state, values.isFirstTimeVoter);
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const handleReset = useCallback(() => setJourneyContent(null), []);
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8" role="region" aria-label="Personalized Voter Journey Builder">
@@ -88,26 +102,26 @@ export function VoterJourney() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" {...register('name')} aria-invalid={!!errors.name} />
-                  {errors.name && <p className="text-sm text-red-500" role="alert">{errors.name.message as string}</p>}
+                  <Input id="name" {...register('name')} aria-invalid={!!errors.name} aria-describedby={errors.name ? 'name-error' : undefined} />
+                  {errors.name && <p id="name-error" className="text-sm text-red-500" role="alert">{errors.name.message as string}</p>}
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="age">Age</Label>
-                  <Input id="age" type="number" {...register('age')} aria-invalid={!!errors.age} />
-                  {errors.age && <p className="text-sm text-red-500" role="alert">{errors.age.message as string}</p>}
+                  <Input id="age" type="number" {...register('age')} aria-invalid={!!errors.age} aria-describedby={errors.age ? 'age-error' : undefined} />
+                  {errors.age && <p id="age-error" className="text-sm text-red-500" role="alert">{errors.age.message as string}</p>}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="state">State</Label>
-                  <Input id="state" {...register('state')} aria-invalid={!!errors.state} />
-                  {errors.state && <p className="text-sm text-red-500" role="alert">{errors.state.message as string}</p>}
+                  <Input id="state" {...register('state')} aria-invalid={!!errors.state} aria-describedby={errors.state ? 'state-error' : undefined} />
+                  {errors.state && <p id="state-error" className="text-sm text-red-500" role="alert">{errors.state.message as string}</p>}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
-                  <Input id="city" {...register('city')} aria-invalid={!!errors.city} />
-                  {errors.city && <p className="text-sm text-red-500" role="alert">{errors.city.message as string}</p>}
+                  <Input id="city" {...register('city')} aria-invalid={!!errors.city} aria-describedby={errors.city ? 'city-error' : undefined} />
+                  {errors.city && <p id="city-error" className="text-sm text-red-500" role="alert">{errors.city.message as string}</p>}
                 </div>
               </div>
 
@@ -117,7 +131,7 @@ export function VoterJourney() {
               </div>
 
               {error && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" role="alert">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
@@ -132,7 +146,7 @@ export function VoterJourney() {
         </Card>
       ) : (
         <AnimatePresence>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6" aria-live="polite">
                 
                 <Alert className="bg-primary/10 border-primary/20">
                     <ClipboardList className="h-5 w-5 text-primary" />
@@ -198,7 +212,7 @@ export function VoterJourney() {
                      ))}
                 </div>
                 
-                <Button variant="outline" onClick={() => setJourneyContent(null)} className="w-full mt-8">Start Over</Button>
+                <Button variant="outline" onClick={handleReset} className="w-full mt-8">Start Over</Button>
 
             </motion.div>
         </AnimatePresence>
@@ -206,3 +220,5 @@ export function VoterJourney() {
     </div>
   );
 }
+
+export const VoterJourney = memo(VoterJourneyComponent);

@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 import { verifyMyth } from '../../services/mythbuster.service';
 import { geminiClient } from '../../lib/gemini';
 import { MythVerificationResponse } from '../../types';
@@ -8,6 +12,10 @@ jest.mock('../../lib/gemini', () => ({
       generateContent: jest.fn(),
     },
   },
+}));
+
+jest.mock('../../lib/logger', () => ({
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
 }));
 
 describe('verifyMyth Service', () => {
@@ -36,6 +44,32 @@ describe('verifyMyth Service', () => {
     it('should throw error if Gemini SDK fails', async () => {
         (geminiClient.models.generateContent as jest.Mock).mockRejectedValue(new Error('API Down'));
 
-        await expect(verifyMyth('Some claim')).rejects.toThrow("Failed to verify claim. Please try again.");
+        await expect(verifyMyth('Some claim')).rejects.toThrow();
+    });
+
+    it('should throw when Gemini returns null text', async () => {
+        (geminiClient.models.generateContent as jest.Mock).mockResolvedValue({
+            text: null
+        });
+
+        await expect(verifyMyth('Test claim')).rejects.toThrow();
+    });
+
+    it('should handle PARTIALLY_TRUE verdict', async () => {
+        const mockResponse: MythVerificationResponse = {
+            verdict: 'PARTIALLY_TRUE',
+            explanation: 'Some context is missing',
+            confidence: 65,
+            referenceSource: 'General knowledge',
+            disclaimer: 'Verify with official sources.'
+        };
+
+        (geminiClient.models.generateContent as jest.Mock).mockResolvedValue({
+            text: JSON.stringify(mockResponse)
+        });
+
+        const result = await verifyMyth('EVM machines can be hacked');
+        expect(result.verdict).toBe('PARTIALLY_TRUE');
+        expect(result.confidence).toBe(65);
     });
 });

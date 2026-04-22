@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "test": "jest --detectOpenHandles --forceExit",
+    "test:coverage": "jest --coverage --detectOpenHandles --forceExit",
+    "deploy:firebase": "firebase deploy"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -40,6 +43,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "firebase-tools": "^15.15.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "mockdate": "^3.0.5",

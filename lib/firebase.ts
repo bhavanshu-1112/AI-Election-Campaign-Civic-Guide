@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Firebase client SDK initialization.
+ * Configures Firebase App, Firestore, and Authentication for client-side usage.
+ * Analytics is initialized lazily via lib/analytics.ts to support SSR.
+ */
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -11,10 +17,13 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
+/** Firebase App instance (singleton pattern prevents re-initialization) */
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
+/** Firestore database instance for client-side reads */
 const db = getFirestore(app);
+
+/** Firebase Authentication instance for Google Sign-In */
 const auth = getAuth(app);
 
 export { app, db, auth };

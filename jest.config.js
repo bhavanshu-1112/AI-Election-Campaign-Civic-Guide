@@ -16,6 +16,11 @@ const customJestConfig = {
     "services/**/*.{ts,tsx}",
     "app/api/**/*.{ts,tsx}",
     "components/features/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "!lib/firebase.ts",
+    "!lib/firebase-admin.ts",
+    "!lib/gemini.ts",
+    "!lib/analytics.ts",
     "!**/*.d.ts",
     "!.next/**",
     "!**/node_modules/**"
