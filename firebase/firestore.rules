@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users collection: Only the user can read/write their own document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 2. Election Stages: Universally readable by authenticated users (or anyone), but write-protected (admin only)
+    match /election_stages/{stageId} {
+      allow read: if isAuthenticated(); // or allow read: if true; depending on requirements
+      allow write: if false; // Only written via Cloud Functions/Admin
+    }
+
+    // 3. User Checklists: Only the user can access their own
+    match /user_checklists/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 4. FAQ Sessions: Only the owning user can access
+    match /faq_sessions/{sessionId} {
+      allow read, write: if isOwner(resource.data.userId) || (request.method == 'create' && isOwner(request.resource.data.userId));
+    }
+
+    // 5. AI Cache: Server-side only
+    match /ai_cache/{docId} {
+      allow read, write: if false; // Only accessible via Admin SDK
+    }
+
+    // 6. Analytics: Server-side only
+    match /analytics/{docId} {
+      allow read, write: if false; // Only accessible via Admin SDK
+    }
+  }
+}
