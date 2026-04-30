@@ -4,15 +4,30 @@
  * Handles multi-turn conversations with history context for coherent follow-ups.
  */
 
-import { geminiClient } from '@/lib/gemini';
+import { geminiClient, geminiRequestConfig } from '@/lib/gemini';
 import { FAQResponse } from '@/types';
 import { AIServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { GEMINI_CONFIG, ERROR_MESSAGES } from '@/lib/constants';
 
+/** System instruction for FAQ chat sessions */
+const SYSTEM_INSTRUCTION = `You are a helpful, unbiased election information assistant for India.
+Answer only election-related questions. For each response provide ONLY a valid JSON object matching this structure:
+{
+  "answer": "string",
+  "confidence": number (0-100),
+  "sources": ["string"],
+  "disclaimer": "string",
+  "isElectionRelated": boolean
+}
+If confidence < 60, explicitly say 'Please verify with official sources.' in the disclaimer.
+If the question is not election-related, set isElectionRelated: false and politely redirect the user in the answer field.
+Never generate political opinions or favor any party/candidate. Return pure JSON without markdown tags.`;
+
 /**
  * Answers an election-related FAQ question using Gemini with conversation history.
- * Uses structured JSON output mode to ensure reliable parsing of responses.
+ * Uses structured JSON output mode with safety settings and generation config
+ * to ensure reliable, safe parsing of responses.
  *
  * @param message - The user's question
  * @param history - Previous conversation messages for context continuity
@@ -29,25 +44,12 @@ export const answerFAQ = async (
     parts: [{ text: h.content }],
   }));
 
-  const systemInstruction = `You are a helpful, unbiased election information assistant for India.
-  Answer only election-related questions. For each response provide ONLY a valid JSON object matching this structure:
-  {
-    "answer": "string",
-    "confidence": number (0-100),
-    "sources": ["string"],
-    "disclaimer": "string",
-    "isElectionRelated": boolean
-  }
-  If confidence < 60, explicitly say 'Please verify with official sources.' in the disclaimer.
-  If the question is not election-related, set isElectionRelated: false and politely redirect the user in the answer field.
-  Never generate political opinions or favor any party/candidate. Return pure JSON without markdown tags.`;
-
   try {
     const chat = geminiClient.chats.create({
       model: GEMINI_CONFIG.MODEL,
       config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: GEMINI_CONFIG.RESPONSE_MIME_TYPE,
+        ...geminiRequestConfig,
+        systemInstruction: SYSTEM_INSTRUCTION,
       },
       history: formattedHistory,
     });

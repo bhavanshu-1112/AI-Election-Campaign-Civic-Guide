@@ -21,6 +21,37 @@ export const GEMINI_CONFIG = {
   MAX_HISTORY_MESSAGES: 10,
 } as const;
 
+// ─── Gemini Safety Settings ─────────────────────────────────────────────────
+
+/**
+ * Safety settings applied to all Gemini API calls.
+ * BLOCK_MEDIUM_AND_ABOVE blocks content with a medium or higher probability
+ * of being unsafe, while still allowing low-risk educational content through.
+ */
+export const GEMINI_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+];
+
+// ─── Gemini Generation Configuration ────────────────────────────────────────
+
+/**
+ * Default generation configuration for Gemini API calls.
+ * Controls token usage, creativity, and response diversity.
+ */
+export const GEMINI_GENERATION_CONFIG = {
+  /** Controls randomness: lower = more deterministic (0.0–2.0) */
+  temperature: 0.3,
+  /** Nucleus sampling: considers tokens with cumulative probability ≤ topP */
+  topP: 0.8,
+  /** Limits token pool to top K candidates per step */
+  topK: 40,
+  /** Hard cap on output length to prevent excessive token usage and cost */
+  maxOutputTokens: 2048,
+} as const;
+
 // ─── Firestore Collection Names ─────────────────────────────────────────────
 
 export const COLLECTIONS = {

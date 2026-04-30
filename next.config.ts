@@ -33,6 +33,21 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=()',
   },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://www.googletagmanager.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: https: blob:",
+      "font-src 'self' https://fonts.gstatic.com",
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com wss://*.firebaseio.com https://www.google-analytics.com",
+      "frame-src 'self' https://accounts.google.com https://*.firebaseapp.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
+  },
 ];
 
 const nextConfig: NextConfig = {
@@ -46,7 +61,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  /** Optimize bundle by enabling experimental features */
+  /** Suppress X-Powered-By header for security */
   poweredByHeader: false,
 
   /** Image optimization configuration */
@@ -60,6 +75,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  /** Optimize Firebase Admin SDK bundling for serverless functions */
+  serverExternalPackages: ['firebase-admin'],
 };
 
 export default nextConfig;

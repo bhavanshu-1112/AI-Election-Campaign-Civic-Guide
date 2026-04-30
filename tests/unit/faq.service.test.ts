@@ -12,6 +12,14 @@ jest.mock('../../lib/gemini', () => ({
       create: jest.fn(),
     },
   },
+  geminiRequestConfig: {
+    safetySettings: [],
+    responseMimeType: 'application/json',
+    temperature: 0.3,
+    topP: 0.8,
+    topK: 40,
+    maxOutputTokens: 2048,
+  },
 }));
 
 jest.mock('../../lib/logger', () => ({

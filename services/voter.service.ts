@@ -4,28 +4,55 @@
  * Processes user demographics to create tailored voting guidance with deadlines and documents.
  */
 
-import { geminiClient } from '@/lib/gemini';
+import { geminiClient, geminiRequestConfig } from '@/lib/gemini';
 import { User, VoterJourneyResponse } from '@/types';
 import { AIServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { GEMINI_CONFIG, ERROR_MESSAGES } from '@/lib/constants';
 
+/** System instruction to ground the model as a neutral election guide */
+const SYSTEM_INSTRUCTION = `You are a neutral, factual election guide for India.
+You only answer questions related to the Indian election process.
+Never express political opinions or favor any party/candidate.
+If unsure about a fact, say "Please verify with official sources."
+Never fabricate deadlines, legal requirements, or official processes.`;
+
+/**
+ * Sanitizes user-provided string input to prevent prompt injection.
+ * Strips control characters and limits length.
+ *
+ * @param input - Raw user input string
+ * @param maxLength - Maximum allowed length
+ * @returns Sanitized string safe for inclusion in prompts
+ */
+function sanitizeInput(input: string, maxLength: number = 200): string {
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '') // Strip control characters
+    .replace(/[<>{}]/g, '')            // Strip angle brackets and braces
+    .trim()
+    .slice(0, maxLength);
+}
+
 /**
  * Generates a personalized voter journey based on the user's profile.
- * Calls Google Gemini with structured JSON output mode for reliable parsing.
+ * Calls Google Gemini with structured JSON output mode, safety settings,
+ * and generation config for reliable, safe parsing.
  *
  * @param userProfile - Partial user profile with demographics
  * @returns Structured journey response with steps, summary, and urgent actions
  * @throws {AIServiceError} When Gemini API fails or returns empty response
  */
 export const generateVoterJourney = async (userProfile: Partial<User>): Promise<VoterJourneyResponse> => {
-  const prompt = `You are a neutral, factual election guide for India. Based on the user 
-  profile provided, generate a personalized step-by-step voter journey. 
+  const safeName = sanitizeInput(userProfile.name || '');
+  const safeState = sanitizeInput(userProfile.location?.state || '');
+  const safeCity = sanitizeInput(userProfile.location?.city || '');
+
+  const prompt = `Based on the user profile provided, generate a personalized step-by-step voter journey. 
   
   User Profile:
-  Name: ${userProfile.name}
-  State: ${userProfile.location?.state}
-  City: ${userProfile.location?.city}
+  Name: ${safeName}
+  State: ${safeState}
+  City: ${safeCity}
   Age: ${userProfile.age}
   First Time Voter: ${userProfile.isFirstTimeVoter}
   Role: ${userProfile.role}
@@ -36,15 +63,15 @@ export const generateVoterJourney = async (userProfile: Partial<User>): Promise<
     "summary": string,
     "urgentActions": string[]
   }
-  Do not include any political opinions. If unsure, say 'Please verify 
-  with official sources.' Never make up deadlines or legal requirements. Ensure the response is valid JSON format without markdown ticks outside the object.`;
+  Ensure the response is valid JSON format without markdown ticks outside the object.`;
 
   try {
     const response = await geminiClient.models.generateContent({
       model: GEMINI_CONFIG.MODEL,
       contents: prompt,
       config: {
-        responseMimeType: GEMINI_CONFIG.RESPONSE_MIME_TYPE,
+        ...geminiRequestConfig,
+        systemInstruction: SYSTEM_INSTRUCTION,
       },
     });
 

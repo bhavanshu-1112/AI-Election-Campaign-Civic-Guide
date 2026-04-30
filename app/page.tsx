@@ -1,12 +1,37 @@
 'use client';
 
-import { VoterJourney } from '@/components/features/VoterJourney';
-import { InteractiveTimeline } from '@/components/features/InteractiveTimeline';
-import { ReadinessChecklist } from '@/components/features/ReadinessChecklist';
-import { FAQBot } from '@/components/features/FAQBot';
-import { MythBuster } from '@/components/features/MythBuster';
-import { AuthButton, useAuth } from '@/components/features/AuthProvider';
+import dynamic from 'next/dynamic';
+import { useAuth } from '@/components/features/AuthProvider';
+import { AuthButton } from '@/components/features/AuthProvider';
 import { Shield, Sparkles } from 'lucide-react';
+
+// ─── Dynamic Imports with Loading Skeletons ─────────────────────────────────
+// Lazily load heavy feature components to reduce initial bundle size and improve TTI.
+
+const VoterJourney = dynamic(() => import('@/components/features/VoterJourney').then(m => ({ default: m.VoterJourney })), {
+  loading: () => <div className="h-96 rounded-2xl bg-muted/50 animate-pulse" aria-label="Loading voter journey..." />,
+  ssr: false,
+});
+
+const InteractiveTimeline = dynamic(() => import('@/components/features/InteractiveTimeline').then(m => ({ default: m.InteractiveTimeline })), {
+  loading: () => <div className="h-64 rounded-2xl bg-muted/50 animate-pulse" aria-label="Loading timeline..." />,
+  ssr: false,
+});
+
+const ReadinessChecklist = dynamic(() => import('@/components/features/ReadinessChecklist').then(m => ({ default: m.ReadinessChecklist })), {
+  loading: () => <div className="h-64 rounded-2xl bg-muted/50 animate-pulse" aria-label="Loading checklist..." />,
+  ssr: false,
+});
+
+const FAQBot = dynamic(() => import('@/components/features/FAQBot').then(m => ({ default: m.FAQBot })), {
+  loading: () => <div className="h-64 rounded-2xl bg-muted/50 animate-pulse" aria-label="Loading FAQ bot..." />,
+  ssr: false,
+});
+
+const MythBuster = dynamic(() => import('@/components/features/MythBuster').then(m => ({ default: m.MythBuster })), {
+  loading: () => <div className="h-64 rounded-2xl bg-muted/50 animate-pulse" aria-label="Loading myth buster..." />,
+  ssr: false,
+});
 
 export default function Home() {
   const { user } = useAuth();
@@ -86,7 +111,7 @@ export default function Home() {
       <footer className="mt-32 border-t py-12 bg-muted/30">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 text-center text-muted-foreground text-sm font-medium flex flex-col items-center">
               <Shield className="w-8 h-8 mb-4 opacity-50" />
-              <p>Built securely using Google Cloud, Firebase & Next.js.</p>
+              <p>Built securely using Google Cloud, Firebase &amp; Next.js.</p>
               <p className="mt-2">Always verify critical dates and requirements with the official Election Commission portals.</p>
           </div>
       </footer>

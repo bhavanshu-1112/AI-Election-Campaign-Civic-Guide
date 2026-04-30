@@ -2,6 +2,7 @@
  * @fileoverview User Checklist API route.
  * Manages voter readiness checklist state in Firebase Firestore.
  * Supports both fetching and updating checklist items.
+ * GET responses are cached for efficiency; POST invalidates and re-fetches.
  */
 
 import { NextResponse } from 'next/server';
@@ -9,8 +10,10 @@ import { z } from 'zod';
 import { getUserChecklist, updateUserChecklist } from '@/services/checklist.service';
 import { handleApiError, ValidationError, RateLimitError } from '@/lib/errors';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limiter';
+import { getCachedResponse, setCachedResponse, generateCacheKey } from '@/lib/cache';
 import { logger } from '@/lib/logger';
 import { ERROR_MESSAGES } from '@/lib/constants';
+import { UserChecklist } from '@/types';
 
 /** Zod schema for checklist update validation */
 const checklistSchema = z.object({
@@ -23,6 +26,7 @@ const checklistSchema = z.object({
 /**
  * GET /api/checklist/[userId]
  * Retrieves the current checklist state for a user.
+ * Results are cached in Firestore to reduce redundant reads.
  */
 export async function GET(req: Request, context: { params: Promise<{ userId: string }> }): Promise<NextResponse> {
     try {
@@ -31,7 +35,19 @@ export async function GET(req: Request, context: { params: Promise<{ userId: str
             throw new ValidationError('User ID is required');
         }
 
+        // Check cache first
+        const cacheKey = generateCacheKey(`checklist-${userId}`);
+        const cached = await getCachedResponse<UserChecklist>(cacheKey);
+        if (cached) {
+            logger.info('Returning cached checklist', { userId });
+            return NextResponse.json(cached);
+        }
+
         const data = await getUserChecklist(userId);
+
+        // Cache the result
+        await setCachedResponse(cacheKey, `checklist-${userId}`, data);
+
         return NextResponse.json(data);
 
     } catch (error: unknown) {

@@ -4,24 +4,47 @@
  * Returns structured verdicts with confidence scores and source references.
  */
 
-import { geminiClient } from '@/lib/gemini';
+import { geminiClient, geminiRequestConfig } from '@/lib/gemini';
 import { MythVerificationResponse } from '@/types';
 import { AIServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { GEMINI_CONFIG, ERROR_MESSAGES } from '@/lib/constants';
 
+/** System instruction to ground the model as a neutral fact-checker */
+const SYSTEM_INSTRUCTION = `You are a neutral fact-checker for election-related claims in India.
+Never express political bias or favor any party/candidate.
+If confidence is below 50, always set the verdict to UNVERIFIED.
+Do not fabricate sources — only reference sources you are confident about.
+Always include a disclaimer that this is AI-generated analysis.`;
+
+/**
+ * Sanitizes user-provided claim input to prevent prompt injection.
+ * Strips control characters and dangerous patterns.
+ *
+ * @param input - Raw claim string from user
+ * @returns Sanitized string safe for inclusion in prompts
+ */
+function sanitizeClaim(input: string): string {
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '') // Strip control characters
+    .replace(/[<>{}]/g, '')            // Strip angle brackets and braces
+    .trim();
+}
+
 /**
  * Verifies an election-related claim using Gemini AI fact-checking.
  * Returns a structured verdict (TRUE/FALSE/PARTIALLY_TRUE/UNVERIFIED)
  * with explanation, confidence score, and reference sources.
+ * Applies safety settings and generation config for consistent, safe responses.
  *
  * @param claim - The election-related claim to fact-check
  * @returns Structured myth verification response with verdict and confidence
  * @throws {AIServiceError} When Gemini API fails or returns empty response
  */
 export const verifyMyth = async (claim: string): Promise<MythVerificationResponse> => {
-  const prompt = `You are a neutral fact-checker for election-related claims in India.
-  Analyze the claim below and return ONLY valid JSON in this exact structure:
+  const safeClaim = sanitizeClaim(claim);
+
+  const prompt = `Analyze the claim below and return ONLY valid JSON in this exact structure:
   {
     "verdict": "TRUE" | "FALSE" | "PARTIALLY_TRUE" | "UNVERIFIED",
     "explanation": "string (max 200 words)",
@@ -30,19 +53,17 @@ export const verifyMyth = async (claim: string): Promise<MythVerificationRespons
     "disclaimer": "This is AI-generated analysis. Always verify with official sources."
   }
   
-  Claim: "${claim}"
+  Claim: "${safeClaim}"
   
-  Guidelines:
-  - Never express political bias.
-  - If confidence < 50, set verdict to UNVERIFIED.
-  - Do not make up sources. Return accurate and factual information. Ensure the response is perfectly formatted JSON without markdown wrappers.`;
+  Ensure the response is perfectly formatted JSON without markdown wrappers.`;
 
   try {
     const response = await geminiClient.models.generateContent({
       model: GEMINI_CONFIG.MODEL,
       contents: prompt,
       config: {
-        responseMimeType: GEMINI_CONFIG.RESPONSE_MIME_TYPE,
+        ...geminiRequestConfig,
+        systemInstruction: SYSTEM_INSTRUCTION,
       },
     });
 
