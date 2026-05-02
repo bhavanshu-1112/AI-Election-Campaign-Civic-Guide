@@ -66,4 +66,17 @@ describe('ReadinessChecklist Component', () => {
     expect(confetti).toHaveBeenCalled();
     expect(trackChecklistCompleted).toHaveBeenCalled();
   });
+
+  it('should handle fetch error for authenticated user', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+    const { waitFor } = require('@testing-library/react');
+    
+    render(<ReadinessChecklist userId="authenticated-user-id" />);
+    
+    // We expect the catch block to be hit and loading state to end, 
+    // rendering the component normally without crashing.
+    await waitFor(() => {
+      expect(screen.getByText('Voter Registration Confirmed')).toBeInTheDocument();
+    });
+  });
 });

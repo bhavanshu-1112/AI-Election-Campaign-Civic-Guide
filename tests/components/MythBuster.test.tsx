@@ -195,6 +195,21 @@ describe('MythBuster Component', () => {
     });
   });
 
+  it('should show generic error when API fails and json parse fails', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error('Cannot parse JSON')),
+    });
+
+    render(<MythBuster />);
+    fireEvent.change(screen.getByLabelText('Claim input'), { target: { value: 'A claim to check' } });
+    fireEvent.click(screen.getByText('Check Fact'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to verify claim');
+    });
+  });
+
   it('should show generic error on network failure', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 

@@ -169,18 +169,39 @@ describe('InteractiveTimeline Component', () => {
   });
 
   it('should handle clicking the scroll right button', () => {
+    const scrollByMock = jest.fn();
+    const originalQuerySelector = Element.prototype.querySelector;
+    jest.spyOn(Element.prototype, 'querySelector').mockImplementation(function(this: any, selector: string) {
+        if (selector === '[data-radix-scroll-area-viewport]') {
+            return { scrollBy: scrollByMock } as any;
+        }
+        return originalQuerySelector.call(this, selector);
+    });
+    
     render(<InteractiveTimeline />);
     const rightButton = screen.getByLabelText('Scroll timeline right');
-    // Should not throw on click
     fireEvent.click(rightButton);
-    expect(rightButton).toBeInTheDocument();
+    expect(scrollByMock).toHaveBeenCalledWith({ left: 300, behavior: 'smooth' });
+    
+    jest.restoreAllMocks();
   });
 
   it('should handle clicking the scroll left button', () => {
+    const scrollByMock = jest.fn();
+    const originalQuerySelector = Element.prototype.querySelector;
+    jest.spyOn(Element.prototype, 'querySelector').mockImplementation(function(this: any, selector: string) {
+        if (selector === '[data-radix-scroll-area-viewport]') {
+            return { scrollBy: scrollByMock } as any;
+        }
+        return originalQuerySelector.call(this, selector);
+    });
+    
     render(<InteractiveTimeline />);
     const leftButton = screen.getByLabelText('Scroll timeline left');
     fireEvent.click(leftButton);
-    expect(leftButton).toBeInTheDocument();
+    expect(scrollByMock).toHaveBeenCalledWith({ left: -300, behavior: 'smooth' });
+    
+    jest.restoreAllMocks();
   });
 
   it('should display the panel with correct aria attributes', () => {

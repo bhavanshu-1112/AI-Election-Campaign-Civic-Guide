@@ -73,6 +73,55 @@ describe('FAQBot Component', () => {
     });
   });
 
+  it('should display error message on network failure', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+    render(<FAQBot />);
+
+    const input = screen.getByLabelText('Chat input');
+    fireEvent.change(input, { target: { value: 'What ID do I need?' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Sorry, I am having trouble connecting right now. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should trigger scrollTo when new messages are added', async () => {
+    const scrollToMock = jest.fn();
+    const originalQuerySelector = Element.prototype.querySelector;
+    jest.spyOn(Element.prototype, 'querySelector').mockImplementation(function(this: any, selector: string) {
+        if (selector === '[data-radix-scroll-area-viewport]') {
+            return { scrollHeight: 1000, scrollTo: scrollToMock } as any;
+        }
+        return originalQuerySelector.call(this, selector);
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        answer: 'You need a voter ID.',
+        confidence: 90,
+        sources: [],
+        disclaimer: '',
+        isElectionRelated: true,
+        sessionId: 'test-session',
+      }),
+    });
+
+    render(<FAQBot />);
+
+    const input = screen.getByLabelText('Chat input');
+    fireEvent.change(input, { target: { value: 'What ID do I need?' } });
+    fireEvent.submit(input.closest('form')!);
+
+    await waitFor(() => {
+      expect(scrollToMock).toHaveBeenCalled();
+    });
+    
+    jest.restoreAllMocks();
+  });
+
   it('should display AI disclaimer text', () => {
     render(<FAQBot />);
     expect(screen.getByText(/AI can make mistakes/i)).toBeInTheDocument();

@@ -95,6 +95,18 @@ describe('Cache Utilities', () => {
       const result = await getCachedResponse('error-key');
       expect(result).toBeNull();
     });
+
+    it('should return null when doc exists but data is undefined', async () => {
+      const mockGet = jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => undefined,
+      });
+      const mockDoc = jest.fn().mockReturnValue({ get: mockGet });
+      (adminDb.collection as jest.Mock).mockReturnValue({ doc: mockDoc });
+
+      const result = await getCachedResponse('undefined-data-key');
+      expect(result).toBeNull();
+    });
   });
 
   describe('setCachedResponse', () => {

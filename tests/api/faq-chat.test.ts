@@ -102,4 +102,44 @@ describe('POST /api/faq/chat', () => {
     const res = await POST(req);
     expect(res.status).toBe(429);
   });
+
+  it('should load history if sessionId is provided', async () => {
+    (checkRateLimit as jest.Mock).mockReturnValue({ allowed: true, remaining: 19 });
+    const { adminDb } = require('../../lib/firebase-admin');
+    
+    // Override the get mock for this test
+    const mockGet = jest.fn().mockResolvedValue({
+      exists: true,
+      data: () => ({
+        messages: [{ role: 'user', content: 'previous message' }]
+      })
+    });
+    
+    (adminDb.collection().doc as jest.Mock).mockReturnValue({
+      get: mockGet,
+      set: jest.fn().mockResolvedValue(undefined),
+    });
+
+    const mockResponse = {
+      answer: 'New answer.',
+      confidence: 90,
+      sources: [],
+      disclaimer: '',
+      isElectionRelated: true,
+    };
+    (answerFAQ as jest.Mock).mockResolvedValue(mockResponse);
+
+    const req = new Request('http://localhost/api/faq/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'guest', sessionId: 'existing-session', message: 'New question?' }),
+    });
+
+    const res = await POST(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.sessionId).toBe('existing-session');
+    expect(answerFAQ).toHaveBeenCalledWith('New question?', [{ role: 'user', content: 'previous message' }]);
+  });
 });

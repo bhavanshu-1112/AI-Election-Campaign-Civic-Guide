@@ -75,4 +75,34 @@ describe('Rate Limiter', () => {
       expect(id).toBe('anonymous');
     });
   });
+
+  describe('cleanupStaleEntries', () => {
+    beforeEach(() => {
+      jest.resetModules();
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should remove stale entries periodically', () => {
+      const { logger } = require('../../lib/logger');
+      const { checkRateLimit } = require('../../lib/rate-limiter');
+      
+      // Make a request to create an entry
+      checkRateLimit('cleanup-user-1', 10, 1000);
+      checkRateLimit('cleanup-user-2', 10, 600000); // 10 minutes window
+
+      // Fast forward past the first user's window (1000ms), but under the 5 min cleanup interval
+      jest.advanceTimersByTime(2000);
+      
+      // Fast forward past the 5 minute cleanup interval
+      jest.advanceTimersByTime(5 * 60 * 1000);
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('Rate limiter cleanup: removed 1 stale entries')
+      );
+    });
+  });
 });

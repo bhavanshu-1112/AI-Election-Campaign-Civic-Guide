@@ -139,6 +139,26 @@ describe('VoterJourney Component', () => {
     });
   });
 
+  it('should show generic error when API fails and json parse fails', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error('Cannot parse JSON')),
+    });
+
+    render(<VoterJourney />);
+
+    fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Test' } });
+    fireEvent.change(screen.getByLabelText('Age'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('State'), { target: { value: 'Delhi' } });
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Delhi' } });
+
+    fireEvent.click(screen.getByText('Generate Roadmap'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to generate journey')).toBeInTheDocument();
+    });
+  });
+
   it('should show error on network failure', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 

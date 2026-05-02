@@ -108,4 +108,25 @@ describe('generateVoterJourney Service', () => {
 
     await expect(generateVoterJourney(mockUser)).rejects.toThrow();
   });
+
+  it('should handle missing name and location gracefully by using empty strings', async () => {
+    const mockUser: Partial<User> = {
+      age: 18,
+      isFirstTimeVoter: true,
+      role: 'voter'
+    };
+
+    (geminiClient.models.generateContent as jest.Mock).mockResolvedValue({
+      text: JSON.stringify({ steps: [], summary: 'No details summary', urgentActions: [] }),
+    });
+
+    const response = await generateVoterJourney(mockUser);
+    
+    expect(geminiClient.models.generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.stringContaining('Name: \n  State: \n  City: \n  Age: 18')
+      })
+    );
+    expect(response.summary).toBe('No details summary');
+  });
 });

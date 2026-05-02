@@ -14,14 +14,14 @@ describe('Logger Module', () => {
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    (process.env as any).NODE_ENV = originalEnv;
     jest.restoreAllMocks();
     jest.resetModules();
   });
 
   describe('Development mode', () => {
     beforeEach(() => {
-      process.env.NODE_ENV = 'development';
+      (process.env as any).NODE_ENV = 'development';
     });
 
     it('should log info messages with prefix', () => {
@@ -75,7 +75,7 @@ describe('Logger Module', () => {
 
   describe('Production mode', () => {
     beforeEach(() => {
-      process.env.NODE_ENV = 'production';
+      (process.env as any).NODE_ENV = 'production';
     });
 
     it('should output structured JSON for info logs', () => {
